@@ -30,7 +30,7 @@ def export_p12(ca_cert, client_cert, client_key, passphrase='pass'):
 
     cp12 = client_p12.export(passphrase=passphrase, iter=2048, maciter=1024)
 
-    return cp12
+    return {'p12': client_p12, 'bin': cp12}
 
 
 def main():
@@ -69,10 +69,57 @@ def main():
 
     cert, key = client_cert_dat
 
-    cert_bin = export_p12(ca_cert, cert, key)
+    cert_dat = export_p12(ca_cert, cert, key)
 
-    with open('client__{}.p12'.format(cluster_name), 'wb') as fh:
-        fh.write(cert_bin)
+    target_dir = os.path.join(
+        os.environ.get('HOME' , '/tmp'),
+        'kube_certs'
+    )
+
+    if not os.path.exists(target_dir):
+        os.mkdir(target_dir, 0700)
+
+    with open(
+        os.path.join(
+            target_dir,
+            'client__{}.p12'.format(cluster_name)
+        ), 'wb') as fh:
+        fh.write(cert_dat['bin'])
+
+    with open(
+        os.path.join(
+            target_dir,
+            'client-cert__{}.pem'.format(cluster_name)
+        ), 'wb') as fh:
+
+        fh.write(
+            crypto.dump_certificate(
+                crypto.FILETYPE_PEM,
+                cert_dat['p12'].get_certificate()
+            )
+        )
+
+    with open(
+        os.path.join(
+            target_dir,
+            'client-key__{}.pem'.format(cluster_name)
+        ), 'wb') as fh:
+
+        fh.write(
+            crypto.dump_privatekey(
+                crypto.FILETYPE_PEM,
+                cert_dat['p12'].get_privatekey()
+            )
+        )
+
+    with open(
+        os.path.join(
+            target_dir,
+            'ca-cert__{}.pem'.format(cluster_name)
+        ), 'wb') as fh:
+
+        for el in cert_dat['p12'].get_ca_certificates():
+            fh.write(crypto.dump_certificate(crypto.FILETYPE_PEM, el))
 
     return True
 
